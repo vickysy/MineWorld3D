@@ -861,7 +861,29 @@
                     data.worldMap.forEach(([k, v]) => worldMap.set(k, v));
                     if (data.modifiedColumns) data.modifiedColumns.forEach(v => modifiedColumns.add(v));
                     if (data.columnMinY) data.columnMinY.forEach(([k, v]) => columnMinY.set(k, v));
-                    if (data.chunkMaxY) data.chunkMaxY.forEach(([k, v]) => chunkMaxY.set(k, v));
+                    if (data.chunkMaxY) {
+                        data.chunkMaxY.forEach(([k, v]) => chunkMaxY.set(k, v));
+                    } else {
+                        // 如果是旧版本存档，没有保存 chunkMaxY，则必须遍历所有世界方块重新计算！
+                        // 否则向上建的高楼大厦（超过地形自然高度的部分）将无法渲染，表现为被“掩埋”或“切断”。
+                        worldMap.forEach((type, key) => {
+                            if (typeof type === 'number') {
+                                const parts = key.split(',');
+                                if (parts.length === 3) {
+                                    const x = parseInt(parts[0]);
+                                    const y = parseInt(parts[1]);
+                                    const z = parseInt(parts[2]);
+                                    const cx = Math.floor(x / CHUNK_SIZE);
+                                    const cz = Math.floor(z / CHUNK_SIZE);
+                                    const chunkKey = `${cx},${cz}`;
+                                    const currentMax = chunkMaxY.get(chunkKey) || -999;
+                                    if (y > currentMax) {
+                                        chunkMaxY.set(chunkKey, y);
+                                    }
+                                }
+                            }
+                        });
+                    }
                     
                     // 重新添加火把光源
                     worldMap.forEach((type, key) => {
@@ -1113,11 +1135,12 @@
             const key = `${x},${z}`;
             if (heightCache.has(key)) return heightCache.get(key);
             
-            // 恢复旧的平缓地形，避免高山掩埋以前的存档建筑
-            let h = 10;
-            h += Math.sin(x * 0.1) * 2;
-            h += Math.cos(z * 0.1) * 2;
-            h += Math.sin((x + z) * 0.05) * 2;
+            // 恢复最初的山脉地形公式，确保旧存档的建筑和树木完美贴合地面，不再悬空！
+            let h = 15;
+            h += Math.sin(x * 0.03) * 12;
+            h += Math.cos(z * 0.02) * 15;
+            h += Math.sin((x + z) * 0.015) * 10;
+            h += Math.cos((x - z) * 0.05) * 5;
             
             h = Math.floor(h);
             
