@@ -147,7 +147,7 @@
             <hr style="border-color: #555; margin-bottom: 20px;">
 
             <h3 style="margin: 0 0 15px 0; font-size: 20px;">加入朋友的服务器:</h3>
-            <input type="text" id="server-ip" placeholder="输入朋友的服务器地址 (默认 localhost)" value="localhost" style="width: 90%; padding: 12px; margin-bottom: 20px; font-size: 18px; text-align: center; border-radius: 5px; border: none; background: #fff;">
+            <input type="text" id="server-ip" placeholder="输入朋友的服务器地址 (默认 Minecraft)" value="Minecraft" style="width: 90%; padding: 12px; margin-bottom: 20px; font-size: 18px; text-align: center; border-radius: 5px; border: none; background: #fff;">
             
             <button onclick="connectToServer()" style="margin: 10px auto; padding: 15px; width: 90%; font-size: 20px; cursor: pointer; background-color: #2196F3; border: none; border-radius: 5px; color: white; font-weight: bold; display: block; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">连接并进入世界</button>
             <button onclick="hideMultiplayerMenu()" style="margin: 10px auto; padding: 12px; width: 90%; font-size: 18px; cursor: pointer; background-color: #f44336; border: none; border-radius: 5px; color: white; font-weight: bold; display: block;">返回主菜单</button>
@@ -717,7 +717,7 @@
 
         window.connectToServer = function() {
             let ip = document.getElementById('server-ip').value.trim();
-            if (!ip) ip = 'localhost';
+            if (!ip) ip = 'Minecraft';
             const url = `ws://${ip}:8081`;
             
             showToast("正在连接服务器...");
@@ -1113,12 +1113,11 @@
             const key = `${x},${z}`;
             if (heightCache.has(key)) return heightCache.get(key);
             
-            // 使用多个正弦波叠加，生成起伏更剧烈的山脉和丘陵，避免一马平川
-            let h = 15;
-            h += Math.sin(x * 0.03) * 12; // 放大波幅，让山更高
-            h += Math.cos(z * 0.02) * 15;
-            h += Math.sin((x + z) * 0.015) * 10;
-            h += Math.cos((x - z) * 0.05) * 5;
+            // 恢复旧的平缓地形，避免高山掩埋以前的存档建筑
+            let h = 10;
+            h += Math.sin(x * 0.1) * 2;
+            h += Math.cos(z * 0.1) * 2;
+            h += Math.sin((x + z) * 0.05) * 2;
             
             h = Math.floor(h);
             
@@ -1187,6 +1186,7 @@
             const colKey = `${x},${z}`;
             const curMinY = columnMinY.get(colKey);
             if (curMinY === undefined || y < curMinY) columnMinY.set(colKey, y);
+
             let key = `${x},${y},${z}`;
             worldMap.set(key, type);
             
@@ -1770,11 +1770,16 @@
             }
             torchLights.clear();
             
-            // 更换种子
+            // 更换种子并随机化出生点，避免每次出生在同一个地方
             seed = Math.random() * 1000;
             dayTime = Math.PI / 2;
             oxygen = 20;
-            camera.position.set(0, 50, 0);
+            
+            // 随机化初始坐标 (范围 -500 到 500)
+            const spawnX = Math.floor(Math.random() * 1000 - 500);
+            const spawnZ = Math.floor(Math.random() * 1000 - 500);
+            const spawnY = getSurfaceHeight(spawnX, spawnZ) + 5;
+            camera.position.set(spawnX, spawnY, spawnZ);
             
             lastChunkX = -999;
             lastChunkZ = -999;
@@ -1837,9 +1842,10 @@
 
         function checkCollision(pos) {
             const checkPoints = [
-                new THREE.Vector3(pos.x, pos.y - PLAYER_HEIGHT + 0.1, pos.z), 
-                new THREE.Vector3(pos.x, pos.y - PLAYER_HEIGHT/2, pos.z), 
-                new THREE.Vector3(pos.x, pos.y - 0.1, pos.z) 
+                new THREE.Vector3(pos.x, pos.y - PLAYER_HEIGHT + 0.1, pos.z), // 脚底
+                new THREE.Vector3(pos.x, pos.y - PLAYER_HEIGHT/2, pos.z), // 身体
+                new THREE.Vector3(pos.x, pos.y - 0.1, pos.z), // 眼睛
+                new THREE.Vector3(pos.x, pos.y + 0.2, pos.z)  // 头顶，防止跳跃时头卡进天花板导致透视虚空
             ];
 
             for (let pt of checkPoints) {
