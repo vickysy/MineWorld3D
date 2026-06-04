@@ -3267,12 +3267,13 @@
             prevTime = time;
 
             if (isGameStarted) {
-                // 如果按住 Shift (或者跑动/跳跃)，饥饿消耗加快 (最高 3倍)
-                let hungerRate = (holdingSpace || moveForward || moveBackward || moveLeft || moveRight) ? 3.0 : 1.0;
-                hungerTimer += delta * hungerRate;
+                // 按照要求：一整个昼夜（21分钟）掉 3 格饥饿值。
+                // 这样每天打一只牛羊（恢复3格），刚好能保住一天的饥饿度。
+                // 无论跑跳还是站着，都按照真实时间流逝，不再加速掉落。
+                hungerTimer += delta;
                 
-                // 饥饿值掉落大幅减慢：基础设定为 120 秒（2分钟）掉一格，这样差不多一个白天只要吃一两次肉
-                if (hungerTimer >= 120) {
+                // 418 秒（约 7 分钟）掉一格，一天三格
+                if (hungerTimer >= 418) {
                     hungerTimer = 0;
                     if (hunger > 0) {
                         hunger -= 1;
