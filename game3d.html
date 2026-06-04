@@ -3265,8 +3265,12 @@
             prevTime = time;
 
             if (isGameStarted) {
-                hungerTimer += delta;
-                if (hungerTimer >= 30) {
+                // 如果按住 Shift (或者跑动/跳跃)，饥饿消耗加快
+                let hungerRate = (holdingSpace || moveForward || moveBackward || moveLeft || moveRight) ? 3.0 : 1.0;
+                hungerTimer += delta * hungerRate;
+                
+                // 每 5 秒钟结算一次饥饿度（为了测试明显一点，5秒掉1格，如果不动的话。如果一直跑跳，大概不到2秒就掉1格）
+                if (hungerTimer >= 5) {
                     hungerTimer = 0;
                     hunger -= 1;
                     if (hunger < 0) {
