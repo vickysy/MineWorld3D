@@ -40,6 +40,34 @@
         .tab-btn.active {
             background-color: #2E7D32; border: 2px solid #FFEB3B;
         }
+        #hud-container {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            display: flex; flex-direction: column; align-items: center; z-index: 5;
+            pointer-events: none;
+        }
+        #status-bars {
+            display: flex; justify-content: space-between; width: 450px; margin-bottom: 5px;
+        }
+        .status-bar {
+            display: flex; gap: 2px;
+        }
+        .heart, .hunger {
+            width: 18px; height: 18px; font-size: 16px; line-height: 18px; text-shadow: 1px 1px 0 #000;
+        }
+        #hotbar {
+            display: flex; gap: 2px; background-color: rgba(0,0,0,0.5); padding: 4px; border: 2px solid #555;
+            pointer-events: auto;
+        }
+        .hotbar-slot {
+            width: 44px; height: 44px; border: 2px solid #777; background-color: rgba(100,100,100,0.5);
+            display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; position: relative; cursor: pointer;
+        }
+        .hotbar-slot.selected {
+            border-color: #FFF; border-width: 3px; background-color: rgba(200,200,200,0.5);
+        }
+        .hotbar-number {
+            position: absolute; top: 2px; left: 2px; font-size: 10px; text-shadow: 1px 1px 0 #000;
+        }
     </style>
 </head>
 <body>
@@ -94,6 +122,17 @@
     <div id="oxygen-ui" style="display: none; position: absolute; top: 50px; left: 50%; transform: translateX(-50%); font-size: 24px; color: #00FFFF; font-weight: bold; text-shadow: 2px 2px 4px black; z-index: 5;">
         氧气: 20:00
     </div>
+
+    <div id="hud-container">
+        <div id="status-bars">
+            <div id="health-bar" class="status-bar"></div>
+            <div id="hunger-bar" class="status-bar"></div>
+        </div>
+        <div id="hotbar">
+            <!-- 快捷栏由 JS 生成 -->
+        </div>
+    </div>
+
     <div id="minecart-ui" style="display: none; position: absolute; top: 80px; left: 50%; transform: translateX(-50%); font-size: 24px; color: #FFD700; font-weight: bold; text-shadow: 2px 2px 4px black; z-index: 5;">
         正在乘坐矿车 (按 E 下车)
     </div>
@@ -334,6 +373,14 @@
                 ctx.fillRect(12, 16, 12, 12); // 左眼
                 ctx.fillRect(40, 16, 12, 12); // 右眼
                 ctx.fillRect(24, 40, 16, 12); // 嘴巴
+            } else if (type === 'creeper_face') {
+                ctx.fillStyle = '#64DD17'; ctx.fillRect(0,0,64,64); // 亮绿底
+                ctx.fillStyle = '#000000'; // 苦力怕特有的脸
+                ctx.fillRect(12, 16, 16, 16); // 左眼
+                ctx.fillRect(36, 16, 16, 16); // 右眼
+                ctx.fillRect(24, 32, 16, 24); // 嘴巴中间
+                ctx.fillRect(16, 44, 8, 12); // 嘴巴左下
+                ctx.fillRect(40, 44, 8, 12); // 嘴巴右下
             } else if (type === 'crafting_top') {
                 ctx.fillStyle = '#CD853F'; ctx.fillRect(0,0,64,64);
                 ctx.strokeStyle = '#8B4513'; ctx.lineWidth = 4;
@@ -502,7 +549,17 @@
         const matZombieFace = new THREE.MeshLambertMaterial({ map: createTexture('zombie_face') });
         const matZombieBody = new THREE.MeshLambertMaterial({ color: 0x2E7D32 }); // 深绿僵尸身体
         const matZombie = [matZombieBody, matZombieBody, matZombieBody, matZombieBody, matZombieFace, matZombieBody]; // 脸在前面
+        
+        // 苦力怕材质
+        const matCreeperFace = new THREE.MeshLambertMaterial({ map: createTexture('creeper_face') });
+        const matCreeperBody = new THREE.MeshLambertMaterial({ color: 0x64DD17 }); // 亮绿色
+        const matCreeper = [matCreeperBody, matCreeperBody, matCreeperBody, matCreeperBody, matCreeperFace, matCreeperBody];
+
         const matVillager = new THREE.MeshLambertMaterial({ color: 0xD7CCC8 }); // 肉色村民
+
+        const matPig = new THREE.MeshLambertMaterial({ color: 0xF8BBD0 }); // 粉色猪
+        const matSheep = new THREE.MeshLambertMaterial({ color: 0xF5F5F5 }); // 白色羊
+        const matCow = new THREE.MeshLambertMaterial({ color: 0x4E342E }); // 棕色牛
 
         const matCraftTop = new THREE.MeshLambertMaterial({ map: createTexture('crafting_top') });
         const matCraftSide = new THREE.MeshLambertMaterial({ map: createTexture('crafting_side') });
@@ -512,7 +569,7 @@
         const matFurnace = [matStone, matStone, matStone, matStone, matFurnaceFront, matStone];
         
         const matBedTop = new THREE.MeshLambertMaterial({ map: createTexture('bed_top') });
-        const matBed = [matWood, matWood, matBedTop, matWood, matWood, matWood];
+        const matBed = [matWoodSide, matWoodSide, matBedTop, matWoodTop, matWoodSide, matWoodSide];
         
         const matTorch = new THREE.MeshLambertMaterial({ map: createTexture('torch'), transparent: true, alphaTest: 0.5 });
         
@@ -1085,12 +1142,54 @@
         let villagers = [];
         let minecarts = [];
         let animals = [];
-        const matPig = new THREE.MeshLambertMaterial({ color: 0xFFC0CB }); // 粉色猪
-        const matSheep = new THREE.MeshLambertMaterial({ color: 0xFFFFFF }); // 白色羊
-        const matCow = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // 棕色牛
+        let creepers = [];
+
 
         let ridingMinecart = null;
         let oxygen = 20;
+        let health = 9;
+        const maxHealth = 9;
+        let hunger = 9;
+        const maxHunger = 9;
+
+        function updateHUD() {
+            const healthBar = document.getElementById('health-bar');
+            const hungerBar = document.getElementById('hunger-bar');
+            healthBar.innerHTML = '';
+            hungerBar.innerHTML = '';
+            
+            for (let i = 0; i < maxHealth; i++) {
+                const heart = document.createElement('div');
+                heart.className = 'heart';
+                heart.innerText = i < Math.floor(health) ? '❤️' : (i < health ? '💔' : '🖤');
+                healthBar.appendChild(heart);
+            }
+            
+            for (let i = 0; i < maxHunger; i++) {
+                const leg = document.createElement('div');
+                leg.className = 'hunger';
+                leg.innerText = i < hunger ? '🍗' : '🦴';
+                hungerBar.appendChild(leg);
+            }
+        }
+        
+        function takeDamage(amount) {
+            if (!isGameStarted) return;
+            health -= amount;
+            if (health < 0) health = 0;
+            updateHUD();
+            // TODO: die logic
+            if (health <= 0) {
+                showToast("你死了！");
+                window.resetWorld();
+            }
+        }
+        
+        function restoreHunger(amount) {
+            hunger += amount;
+            if (hunger > maxHunger) hunger = maxHunger;
+            updateHUD();
+        }
         let dayTime = Math.PI / 2; // 开局直接设置为正午(白天)，避免黑屏
 
         // --- 异步区块重建系统 ---
@@ -1732,7 +1831,7 @@
                 case 'Digit6': selectSlot(6); break;
                 case 'Digit7': selectSlot(7); break;
                 case 'Digit8': selectSlot(8); break;
-                case 'Digit9': selectSlot(9); break;
+                case 'Digit9': selectSlot(24); break; // 快捷键 9 绑定到剑 (ID 24)
                 case 'Digit0': selectSlot(10); break;
                 case 'Minus': selectSlot(11); break;
                 case 'Equal': selectSlot(12); break;
@@ -1807,6 +1906,12 @@
             lastChunkX = -999;
             lastChunkZ = -999;
             chunkQueue.length = 0;
+            
+            health = maxHealth;
+            hunger = maxHunger;
+            updateHUD();
+            selectSlot(1);
+            
             updateChunks(camera.position);
         }
 
@@ -1821,11 +1926,44 @@
             if (btnElement) btnElement.classList.add('active');
         };
 
+        // 初始化快捷栏
+        function initHotbar() {
+            const hotbar = document.getElementById('hotbar');
+            const slotIds = [1, 2, 3, 4, 5, 6, 7, 8, 24]; // 前8个是基础方块，第9个是剑
+                const items = ['泥土', '石头', '木头', '树叶', '玻璃', '梯子', '木门', '工作台', '剑(吃肉)'];
+                for (let i = 1; i <= 9; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'hotbar-slot';
+                    slot.id = 'hotbar-slot-' + slotIds[i-1];
+                    slot.onclick = ((idx) => () => selectSlot(slotIds[idx]))(i-1);
+                
+                const num = document.createElement('div');
+                num.className = 'hotbar-number';
+                num.innerText = i;
+                slot.appendChild(num);
+                
+                const text = document.createElement('span');
+                text.innerText = items[i-1];
+                slot.appendChild(text);
+                
+                hotbar.appendChild(slot);
+            }
+        }
+        initHotbar();
+
         window.selectSlot = function(id) {
             for(let i=1; i<=26; i++) {
                 document.getElementById(`inv-${i}`)?.classList.remove('selected');
             }
             document.getElementById(`inv-${id}`)?.classList.add('selected');
+            
+            const hotbarIds = [1, 2, 3, 4, 5, 6, 7, 8, 24];
+            for(let i of hotbarIds) {
+                document.getElementById(`hotbar-slot-${i}`)?.classList.remove('selected');
+            }
+            if (hotbarIds.includes(id)) {
+                document.getElementById(`hotbar-slot-${id}`)?.classList.add('selected');
+            }
             
             // 确保这里的映射和 HTML 里的序号一一对应！
             // 1:泥土(2), 2:石头(3), 3:木头(4), 4:树叶(5), 5:玻璃(6)
@@ -1885,6 +2023,18 @@
                 }
             }
             return false;
+        }
+
+        function spawnCreeper() {
+            const mesh = new THREE.Mesh(mobGeo, matCreeper);
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 25 + Math.random() * 15;
+            const x = camera.position.x + Math.cos(angle) * dist;
+            const z = camera.position.z + Math.sin(angle) * dist;
+            const y = getSurfaceHeight(x, z) + 2;
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+            creepers.push({ mesh, vx: 0, vy: 0, vz: 0, onGround: false, fuseTimer: 0 });
         }
 
         function spawnZombie() {
@@ -2006,10 +2156,70 @@
                     z.soundTimer = 3 + Math.random() * 5; // 每 3~8 秒叫一次
                 }
 
-                // 碰到玩家，取消伤害和传送，让僵尸当个摆设
+                // 碰到玩家造成伤害
                 if (z.mesh.position.distanceTo(camera.position) < 1.5) {
                     z.vx = 0;
                     z.vz = 0;
+                    takeDamage(1 * delta); // 碰到时持续掉血
+                }
+            }
+
+            // 更新苦力怕
+            for (let i = creepers.length - 1; i >= 0; i--) {
+                let c = creepers[i];
+                let dx = camera.position.x - c.mesh.position.x;
+                let dz = camera.position.z - c.mesh.position.z;
+                let len = Math.sqrt(dx*dx + dz*dz);
+                
+                if (len > 0) {
+                    c.vx = (dx/len) * 1.5; 
+                    c.vz = (dz/len) * 1.5;
+                }
+                c.vy -= 25.0 * delta;
+                
+                c.mesh.position.x += c.vx * delta;
+                if (isSolid(Math.round(c.mesh.position.x), Math.round(c.mesh.position.y - 0.9), Math.round(c.mesh.position.z))) {
+                    c.mesh.position.x -= c.vx * delta;
+                    if (c.onGround) c.vy = 6;
+                }
+                
+                c.mesh.position.z += c.vz * delta;
+                if (isSolid(Math.round(c.mesh.position.x), Math.round(c.mesh.position.y - 0.9), Math.round(c.mesh.position.z))) {
+                    c.mesh.position.z -= c.vz * delta;
+                    if (c.onGround) c.vy = 6;
+                }
+                
+                c.mesh.position.y += c.vy * delta;
+                c.onGround = false;
+                if (isSolid(Math.round(c.mesh.position.x), Math.round(c.mesh.position.y - 1), Math.round(c.mesh.position.z))) {
+                    c.mesh.position.y -= c.vy * delta;
+                    c.vy = 0;
+                    c.onGround = true;
+                    c.mesh.position.y = Math.round(c.mesh.position.y - 1) + 1;
+                } else if (c.vy === 0) {
+                    c.vy = -1;
+                }
+
+                // 靠近玩家自爆
+                let distToPlayer = c.mesh.position.distanceTo(camera.position);
+                if (distToPlayer < 3.0) {
+                    c.vx = 0;
+                    c.vz = 0;
+                    c.fuseTimer += delta;
+                    // 膨胀提示
+                    let scale = 1 + (c.fuseTimer / 1.5) * 0.5;
+                    c.mesh.scale.set(scale, scale, scale);
+                    if (c.fuseTimer > 1.5) { // 1.5秒后爆炸
+                        playSound('glass'); // 借用爆炸声音
+                        takeDamage(4); // 炸掉4滴血
+                        igniteTNT(Math.round(c.mesh.position.x), Math.round(c.mesh.position.y), Math.round(c.mesh.position.z));
+                        scene.remove(c.mesh);
+                        creepers.splice(i, 1);
+                        continue;
+                    }
+                } else {
+                    c.fuseTimer = 0;
+                    c.mesh.scale.set(1, 1, 1);
                 }
             }
 
@@ -2308,6 +2518,16 @@
                     }
                     if (hitSomething) break;
 
+                    for (let j = creepers.length - 1; j >= 0; j--) {
+                        if (testPos.distanceTo(creepers[j].mesh.position) < 1.5) {
+                            scene.remove(creepers[j].mesh);
+                            creepers.splice(j, 1);
+                            hitSomething = true;
+                            break;
+                        }
+                    }
+                    if (hitSomething) break;
+
                     for (let j = animals.length - 1; j >= 0; j--) {
                         if (testPos.distanceTo(animals[j].mesh.position) < 1.5) {
                             scene.remove(animals[j].mesh);
@@ -2347,12 +2567,42 @@
             let hitEntity = false;
             for (let i = 0; i < 100; i++) {
                 let testPos = rayPos.clone().addScaledVector(rayDir, i * 0.1);
-                // 打僵尸
+                // 打僵尸和苦力怕
                 for (let j = zombies.length - 1; j >= 0; j--) {
                     if (testPos.distanceTo(zombies[j].mesh.position) < 1.0) {
                         if (e.button === 0) { // 左键打
                             scene.remove(zombies[j].mesh);
                             zombies.splice(j, 1);
+                        }
+                        hitEntity = true;
+                        break;
+                    }
+                }
+                if (hitEntity) break;
+
+                for (let j = creepers.length - 1; j >= 0; j--) {
+                    if (testPos.distanceTo(creepers[j].mesh.position) < 1.0) {
+                        if (e.button === 0) { // 左键打
+                            scene.remove(creepers[j].mesh);
+                            creepers.splice(j, 1);
+                        }
+                        hitEntity = true;
+                        break;
+                    }
+                }
+                if (hitEntity) break;
+
+                // 打动物并吃肉
+                for (let j = animals.length - 1; j >= 0; j--) {
+                    if (testPos.distanceTo(animals[j].mesh.position) < 1.0) {
+                        if (e.button === 0) { // 左键打
+                            if (animals[j].type === 'cow' || animals[j].type === 'pig' || animals[j].type === 'sheep') {
+                                restoreHunger(3); // 吃肉恢复3格饥饿度
+                                showToast("吃掉了" + (animals[j].type === 'cow' ? "牛" : animals[j].type === 'pig' ? "猪" : "羊") + "肉，恢复饥饿度！");
+                                playSound('place'); // 借用音效
+                            }
+                            scene.remove(animals[j].mesh);
+                            animals.splice(j, 1);
                         }
                         hitEntity = true;
                         break;
@@ -2975,6 +3225,7 @@
         let lastFpsTime = performance.now();
 
         let lastSyncTime = 0;
+        let hungerTimer = 0;
 
         function animate() {
             requestAnimationFrame(animate);
@@ -3013,6 +3264,19 @@
             if (delta > 0.1) delta = 0.1; // 【核心修复】防止因为初始生成方块卡顿，导致重力计算过大直接掉进虚空黑屏！
             prevTime = time;
 
+            if (isGameStarted) {
+                hungerTimer += delta;
+                if (hungerTimer >= 30) {
+                    hungerTimer = 0;
+                    hunger -= 1;
+                    if (hunger < 0) {
+                        hunger = 0;
+                        takeDamage(1); // 饿掉血
+                    }
+                    updateHUD();
+                }
+            }
+
             // 昼夜交替
             dayTime += delta * 0.005; // 【极大减缓昼夜交替速度】之前是 0.05，现在慢了 10 倍，更接近真实游戏
             const sunHeight = Math.sin(dayTime);
@@ -3036,9 +3300,8 @@
                 let secs = Math.floor(Math.max(0, oxygen) % 60);
                 document.getElementById('oxygen-ui').innerText = `氧气: ${mins}:${secs.toString().padStart(2, '0')}`;
                 if (oxygen <= 0) {
-                    // 窒息死亡复活
-                    camera.position.set(0, 50, 0);
-                    oxygen = 20; // 20秒
+                    // 疯狂掉血
+                    takeDamage(1 * delta); // 差不多1秒掉一滴血
                 }
             } else {
                 oxygen = 20;
@@ -3061,17 +3324,31 @@
             if (isDay) {
                 dirLight.intensity = Math.max(0.1, sunHeight * 0.8);
                 
-                // 白天烧死僵尸
+                // 白天烧死僵尸和苦力怕
                 for(let z of zombies) scene.remove(z.mesh);
                 zombies = [];
+                for(let c of creepers) scene.remove(c.mesh);
+                creepers = [];
                 
                 // 白天偶尔生成村民
                 if (Math.random() < 0.005 && villagers.length < 5) spawnVillager();
+                
+                // 白天偶尔生成动物
+                if (Math.random() < 0.01 && animals.length < 15) {
+                    let angle = Math.random() * Math.PI * 2;
+                    let dist = 15 + Math.random() * 20;
+                    let x = camera.position.x + Math.cos(angle) * dist;
+                    let z = camera.position.z + Math.sin(angle) * dist;
+                    let y = getSurfaceHeight(x, z) + 2;
+                    let type = Math.random() < 0.33 ? 'pig' : (Math.random() < 0.5 ? 'sheep' : 'cow');
+                    spawnAnimal(type, x, y, z);
+                }
             } else {
                 dirLight.intensity = 0.1; // 微弱月光
                 
-                // 晚上生成僵尸：极大降低生成概率，最多同时存在 4 个
+                // 晚上生成僵尸和苦力怕
                 if (Math.random() < 0.002 && zombies.length < 4) spawnZombie();
+                if (Math.random() < 0.001 && creepers.length < 2) spawnCreeper();
             }
 
             if (isGameStarted) {
