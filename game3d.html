@@ -55,7 +55,8 @@
             width: 20px; height: 20px; font-size: 18px; line-height: 20px; text-shadow: 2px 2px 0 #000;
         }
         #hotbar {
-            display: flex; gap: 2px; background-color: rgba(0,0,0,0.5); padding: 4px; border: 2px solid #555;
+            display: none !important; /* 根据要求隐藏快捷栏方块 */
+            gap: 2px; background-color: rgba(0,0,0,0.5); padding: 4px; border: 2px solid #555;
             pointer-events: auto;
         }
         .hotbar-slot {
@@ -3226,6 +3227,7 @@
 
         let lastSyncTime = 0;
         let hungerTimer = 0;
+        let starvationTimer = 0;
 
         function animate() {
             requestAnimationFrame(animate);
@@ -3265,19 +3267,29 @@
             prevTime = time;
 
             if (isGameStarted) {
-                // 如果按住 Shift (或者跑动/跳跃)，饥饿消耗加快
+                // 如果按住 Shift (或者跑动/跳跃)，饥饿消耗加快 (最高 3倍)
                 let hungerRate = (holdingSpace || moveForward || moveBackward || moveLeft || moveRight) ? 3.0 : 1.0;
                 hungerTimer += delta * hungerRate;
                 
-                // 每 5 秒钟结算一次饥饿度（为了测试明显一点，5秒掉1格，如果不动的话。如果一直跑跳，大概不到2秒就掉1格）
-                if (hungerTimer >= 5) {
+                // 饥饿值掉落大幅减慢：基础设定为 120 秒（2分钟）掉一格，这样差不多一个白天只要吃一两次肉
+                if (hungerTimer >= 120) {
                     hungerTimer = 0;
-                    hunger -= 1;
-                    if (hunger < 0) {
-                        hunger = 0;
-                        takeDamage(1); // 饿掉血
+                    if (hunger > 0) {
+                        hunger -= 1;
+                        updateHUD();
                     }
-                    updateHUD();
+                }
+
+                // 只有饥饿值为 0 时，才会触发“饿掉血”
+                if (hunger === 0) {
+                    starvationTimer += delta;
+                    // 如果不吃饭（饥饿值为0），每 3 分钟（180秒）掉一滴血
+                    if (starvationTimer >= 180) {
+                        starvationTimer = 0;
+                        takeDamage(1);
+                    }
+                } else {
+                    starvationTimer = 0; // 只要吃了饭（有饥饿值），就不算挨饿
                 }
             }
 
